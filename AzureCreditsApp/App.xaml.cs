@@ -31,6 +31,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<CostCache>();
         services.AddSingleton<IAccountService, AccountService>();
         services.AddSingleton<IMonthlyCreditStore, MonthlyCreditStore>();
+        services.AddSingleton<IAppSettingsStore, AppSettingsStore>();
         services.AddSingleton<IAzureCreditService, AzureCreditService>();
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();

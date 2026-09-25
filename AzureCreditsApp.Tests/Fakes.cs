@@ -92,6 +92,15 @@ internal sealed class InMemoryMonthlyCreditStore : IMonthlyCreditStore
     }
 }
 
+internal sealed class InMemoryAppSettingsStore : IAppSettingsStore
+{
+    public AppSettings Settings { get; set; } = new();
+
+    public AppSettings Load() => Settings;
+
+    public void Save(AppSettings settings) => Settings = settings;
+}
+
 internal sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
 {
     public override DateTimeOffset GetUtcNow() => now;
@@ -159,6 +168,11 @@ internal static class TestData
             Subscription("Visual Studio Enterprise Subscription", "MSDN_2014-09-01", spendingLimit: "On"),
             Costs: Costs(currency, (new DateOnly(2026, 9, 2), periodCost), (new DateOnly(2026, 8, 20), 559.28m)),
             BillingPeriod: new BillingPeriod(new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 30)));
+    }
+
+    public static SubscriptionData Internal(string name = "MSFT-ClientCAB-1")
+    {
+        return new SubscriptionData(Subscription(name, "Internal_2014-09-01"));
     }
 
     public static SubscriptionData PayAsYouGo(int resources = 29, decimal monthCost = 1.39m)

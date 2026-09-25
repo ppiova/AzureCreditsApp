@@ -41,7 +41,9 @@ public sealed record SubscriptionCredit(
     int? DaysLeft = null,
     bool IsMonthly = false,
     bool IsEstimate = false,
-    decimal? PeriodCost = null)
+    decimal? PeriodCost = null,
+    decimal? ProjectedPeriodCost = null,
+    decimal? AverageMonthlyCost = null)
 {
     private const string NoValue = "—";
 
@@ -86,9 +88,27 @@ public sealed record SubscriptionCredit(
 
     public string PeriodCostLabel => IsMonthly ? "Cost this period" : "Cost this month";
 
-    public string PeriodCostDisplay => PeriodCost is decimal cost
-        ? Money.Format(cost, string.IsNullOrEmpty(Data.Costs?.Currency) ? Currency : Data.Costs.Currency)
+    public string? CostCurrency => string.IsNullOrEmpty(Data.Costs?.Currency) ? Currency : Data.Costs.Currency;
+
+    public string PeriodCostDisplay => PeriodCost is decimal cost ? Money.Format(cost, CostCurrency) : NoValue;
+
+    public bool HasProjection => ProjectedPeriodCost is > 0m;
+
+    public string ProjectedDisplay => ProjectedPeriodCost is decimal projected && projected > 0
+        ? $"≈ {Money.Format(projected, CostCurrency)} by {(IsMonthly ? "period" : "month")} end"
+        : string.Empty;
+
+    public bool HasAverage => AverageMonthlyCost is not null;
+
+    public string AverageDisplay => AverageMonthlyCost is decimal average
+        ? $"{Money.Format(average, CostCurrency)} / month"
         : NoValue;
+
+    /// <summary>
+    /// False for subscriptions billed to an organization (Microsoft internal,
+    /// Enterprise Agreement, CSP), which the app lists but does not track.
+    /// </summary>
+    public bool IsTracked => Data.BillingProfile is not null || OfferClassifier.TracksCost(Subscription.Offer);
 
     public IReadOnlyList<CreditLot> Lots => Data.BillingProfile?.Lots ?? [];
 

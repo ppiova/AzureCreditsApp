@@ -14,8 +14,13 @@ public static class CreditCalculator
 
     public static SubscriptionCredit Calculate(SubscriptionData data, MonthlyCredit? monthlyCredit, DateTimeOffset now)
     {
-        SubscriptionInfo subscription = data.Subscription;
         DateOnly today = DateOnly.FromDateTime(now.LocalDateTime);
+        return AddCostSummary(CalculateStatus(data, monthlyCredit, now, today), data, today);
+    }
+
+    private static SubscriptionCredit CalculateStatus(SubscriptionData data, MonthlyCredit? monthlyCredit, DateTimeOffset now, DateOnly today)
+    {
+        SubscriptionInfo subscription = data.Subscription;
 
         if (!subscription.IsEnabled)
         {
@@ -263,6 +268,46 @@ public static class CreditCalculator
         }
 
         return (CreditStatus.Healthy, Severity.Good, "On track", false);
+    }
+
+    /// <summary>
+    /// Adds the cost of the current period (billing period for monthly credits,
+    /// calendar month otherwise), a straight-line projection to the end of that
+    /// period, and the average of the previous complete months.
+    /// </summary>
+    private static SubscriptionCredit AddCostSummary(SubscriptionCredit credit, SubscriptionData data, DateOnly today)
+    {
+        if (data.Costs is not CostHistory costs)
+        {
+            return credit;
+        }
+
+        BillingPeriod period = credit.IsMonthly ? data.BillingPeriod ?? CalendarMonth(today) : CalendarMonth(today);
+        decimal periodCost = costs.TotalBetween(period.Start, today);
+        int elapsedDays = today.DayNumber - period.Start.DayNumber + 1;
+        int periodDays = period.End.DayNumber - period.Start.DayNumber + 1;
+        decimal projected = elapsedDays > 0 ? Math.Round(periodCost / elapsedDays * periodDays, 2) : periodCost;
+
+        // Months without any cost have no rows, so count calendar months from the first
+        // month with data up to the last complete month.
+        DateOnly currentMonth = new(today.Year, today.Month, 1);
+        Dictionary<DateOnly, decimal> pastMonths = costs.MonthlyTotals()
+            .Where(month => month.Month < currentMonth)
+            .ToDictionary(month => month.Month, month => month.Amount);
+        decimal? average = null;
+        if (pastMonths.Count > 0)
+        {
+            DateOnly first = pastMonths.Keys.Min();
+            int months = (currentMonth.Year - first.Year) * 12 + currentMonth.Month - first.Month;
+            average = Math.Round(pastMonths.Values.Sum() / months, 2);
+        }
+
+        return credit with
+        {
+            PeriodCost = periodCost,
+            ProjectedPeriodCost = projected,
+            AverageMonthlyCost = average
+        };
     }
 
     private static decimal MonthToDateCost(SubscriptionData data, DateOnly today)

@@ -12,7 +12,8 @@ Cloud Credits Manager is a Windows desktop app for tracking Azure credits across
 - **Azure Sponsorship and other Microsoft Customer Agreement credits:** remaining balance, original amount and expiration date of each credit lot.
 - **Visual Studio monthly credit:** there is no public API, so you enter the monthly amount once and the app estimates what is left from this billing period's cost.
 - Flags what needs attention: credit over 80% used, credit expiring within 30 days, disabled subscriptions, and subscriptions billed to your payment method that still have resources or cost.
-- Six months of cost history per subscription, from Cost Management.
+- Cost this month per subscription with a projection to the end of the month (or billing period), plus six months of history and the monthly average, from Cost Management.
+- *Hide not tracked* filter for subscriptions billed to an organization (Microsoft internal, Enterprise Agreement, CSP); the choice is remembered.
 
 Planned: usage alerts with Windows notifications and a tray icon, Azure budgets, and burn-rate forecasts. See the [milestones](../../milestones).
 
@@ -32,6 +33,7 @@ The app only reads from Azure. Sign-in uses the Microsoft identity platform in y
 
 - `accounts\` — which accounts are signed in (no tokens),
 - `monthly-credits.json` — the monthly amounts you entered,
+- `settings.json` — display preferences such as the *Hide not tracked* filter,
 - `cache\costs\` — the last cost results, reused for up to three hours because Cost Management throttles requests.
 
 ## Requirements

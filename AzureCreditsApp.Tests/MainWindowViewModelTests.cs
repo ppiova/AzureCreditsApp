@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using AzureCreditsApp.Models;
+using AzureCreditsApp.Services;
 using AzureCreditsApp.ViewModels;
 using Xunit;
 
@@ -10,10 +11,47 @@ public class MainWindowViewModelTests
     private readonly FakeAccountService _accounts = new();
     private readonly FakeAzureCreditService _credits = new();
     private readonly InMemoryMonthlyCreditStore _monthlyCredits = new();
+    private readonly InMemoryAppSettingsStore _settings = new();
 
     private MainWindowViewModel CreateViewModel()
     {
-        return new MainWindowViewModel(_accounts, _credits, _monthlyCredits, new FixedTimeProvider(TestData.Now));
+        return new MainWindowViewModel(_accounts, _credits, _monthlyCredits, _settings, new FixedTimeProvider(TestData.Now));
+    }
+
+    [Fact]
+    public async Task HidingNotTrackedKeepsTotalsAndRemembersTheChoice()
+    {
+        _accounts.Saved.Add(TestData.Account);
+        _credits.Subscriptions.Add(TestData.Sponsorship());
+        _credits.Subscriptions.Add(TestData.Internal("MSFT-ClientCAB-1"));
+        _credits.Subscriptions.Add(TestData.Internal("M3CA Shell NonProd"));
+        MainWindowViewModel viewModel = CreateViewModel();
+        await viewModel.InitializeAsync();
+        Assert.Equal(3, viewModel.SubscriptionCount);
+
+        viewModel.HideNotTracked = true;
+
+        Assert.Equal(1, viewModel.SubscriptionCount);
+        Assert.Equal(2, viewModel.HiddenCount);
+        Assert.Equal("2 hidden", viewModel.HiddenDisplay);
+        Assert.Equal(Money.Format(12000m, "USD", compact: true), viewModel.TotalCreditRemaining);
+        Assert.True(_settings.Settings.HideNotTracked);
+        Assert.True(CreateViewModel().HideNotTracked);
+    }
+
+    [Fact]
+    public async Task EverythingHiddenExplainsTheFilter()
+    {
+        _settings.Settings = new AppSettings(HideNotTracked: true);
+        _accounts.Saved.Add(TestData.Account);
+        _credits.Subscriptions.Add(TestData.Internal());
+        MainWindowViewModel viewModel = CreateViewModel();
+
+        await viewModel.InitializeAsync();
+
+        Assert.True(viewModel.ShowEmptyState);
+        Assert.Contains("hidden by the filter", viewModel.EmptyStateMessage);
+        Assert.Null(viewModel.SelectedSubscription);
     }
 
     [Fact]

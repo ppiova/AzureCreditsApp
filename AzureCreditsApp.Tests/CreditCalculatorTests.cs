@@ -188,6 +188,50 @@ public class CreditCalculatorTests
     }
 
     [Fact]
+    public void PayAsYouGoProjectsTheMonthAndAveragesCompleteMonths()
+    {
+        SubscriptionData data = TestData.PayAsYouGo() with
+        {
+            Costs = TestData.Costs(
+                "ARS",
+                (new DateOnly(2026, 4, 5), 2.57m),
+                (new DateOnly(2026, 6, 3), 1.70m),
+                (new DateOnly(2026, 8, 20), 1.74m),
+                (new DateOnly(2026, 9, 10), 1.39m))
+        };
+
+        SubscriptionCredit credit = CreditCalculator.Calculate(data, null, TestData.Now);
+
+        Assert.Equal(1.39m, credit.PeriodCost);
+        // 1.39 over 25 of 30 days.
+        Assert.Equal(1.67m, credit.ProjectedPeriodCost);
+        // April to August is five months, including May and July without cost.
+        Assert.Equal(1.20m, credit.AverageMonthlyCost);
+        Assert.Equal("ARS", credit.CostCurrency);
+    }
+
+    [Fact]
+    public void MonthlyCreditProjectsOverTheBillingPeriod()
+    {
+        SubscriptionCredit credit = CreditCalculator.Calculate(TestData.VisualStudio(), null, TestData.Now);
+
+        Assert.Equal(419.34m, credit.PeriodCost);
+        Assert.Equal(503.21m, credit.ProjectedPeriodCost);
+        Assert.Equal(559.28m, credit.AverageMonthlyCost);
+        Assert.Contains("by period end", credit.ProjectedDisplay);
+    }
+
+    [Fact]
+    public void OrganizationSubscriptionsAreNotTrackedAndHaveNoCost()
+    {
+        SubscriptionCredit credit = CreditCalculator.Calculate(TestData.Internal(), null, TestData.Now);
+
+        Assert.False(credit.IsTracked);
+        Assert.Null(credit.PeriodCost);
+        Assert.False(credit.HasProjection);
+    }
+
+    [Fact]
     public void SummaryWithoutCreditShowsPlaceholder()
     {
         SubscriptionCredit credit = CreditCalculator.Calculate(TestData.PayAsYouGo(), null, TestData.Now);

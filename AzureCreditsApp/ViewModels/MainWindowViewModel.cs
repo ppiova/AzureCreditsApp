@@ -13,8 +13,11 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IAccountService _accountService;
     private readonly IAzureCreditService _creditService;
     private readonly IMonthlyCreditStore _monthlyCredits;
+    private readonly IAppSettingsStore _settings;
     private readonly TimeProvider _time;
     private CreditSnapshot? _snapshot;
+    private bool _hideNotTracked;
+    private int _hiddenCount;
 
     private bool _isBusy;
     private string _statusMessage = string.Empty;
@@ -30,12 +33,15 @@ public sealed class MainWindowViewModel : ObservableObject
         IAccountService accountService,
         IAzureCreditService creditService,
         IMonthlyCreditStore monthlyCredits,
+        IAppSettingsStore settings,
         TimeProvider time)
     {
         _accountService = accountService;
         _creditService = creditService;
         _monthlyCredits = monthlyCredits;
+        _settings = settings;
         _time = time;
+        _hideNotTracked = settings.Load().HideNotTracked;
 
         AddAccountCommand = new AsyncRelayCommand(AddAccountAsync, () => !IsBusy);
         RefreshCommand = new AsyncRelayCommand(RefreshAsync, () => !IsBusy && Accounts.Count > 0);
@@ -127,13 +133,49 @@ public sealed class MainWindowViewModel : ObservableObject
         private set => SetProperty(ref _lastUpdated, value);
     }
 
+    /// <summary>
+    /// Hides subscriptions billed to an organization (Microsoft internal, Enterprise
+    /// Agreement, CSP). Remembered between sessions.
+    /// </summary>
+    public bool HideNotTracked
+    {
+        get => _hideNotTracked;
+        set
+        {
+            if (SetProperty(ref _hideNotTracked, value))
+            {
+                _settings.Save(_settings.Load() with { HideNotTracked = value });
+                Recalculate();
+            }
+        }
+    }
+
+    public int HiddenCount
+    {
+        get => _hiddenCount;
+        private set
+        {
+            if (SetProperty(ref _hiddenCount, value))
+            {
+                OnPropertyChanged(nameof(HasHidden));
+                OnPropertyChanged(nameof(HiddenDisplay));
+            }
+        }
+    }
+
+    public bool HasHidden => HiddenCount > 0;
+
+    public string HiddenDisplay => $"{HiddenCount} hidden";
+
     public bool ShowEmptyState => !IsBusy && Subscriptions.Count == 0;
 
     public string EmptyStateTitle => HasNoAccounts ? "No accounts yet" : "No subscriptions found";
 
     public string EmptyStateMessage => HasNoAccounts
         ? "Add a Microsoft account to see your Azure subscriptions and remaining credit."
-        : "None of the signed-in accounts has access to an Azure subscription.";
+        : HasHidden
+            ? "Every subscription is billed to an organization and hidden by the filter."
+            : "None of the signed-in accounts has access to an Azure subscription.";
 
     public SubscriptionCredit? SelectedSubscription
     {
@@ -407,20 +449,26 @@ public sealed class MainWindowViewModel : ObservableObject
             .OrderByDescending(credit => credit.NeedsAttention)
             .ThenBy(credit => credit.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
+        List<SubscriptionCredit> visible = HideNotTracked
+            ? credits.Where(credit => credit.IsTracked).ToList()
+            : credits;
 
         Subscriptions.Clear();
-        foreach (SubscriptionCredit credit in credits)
+        foreach (SubscriptionCredit credit in visible)
         {
             Subscriptions.Add(credit);
         }
 
+        // Totals cover every subscription; hidden ones are billed to an organization anyway.
         TotalCreditRemaining = CreditCalculator.SummarizeRemaining(credits);
         AttentionCount = credits.Count(credit => credit.NeedsAttention);
+        HiddenCount = credits.Count - visible.Count;
         OnPropertyChanged(nameof(SubscriptionCount));
         OnPropertyChanged(nameof(ShowEmptyState));
+        OnPropertyChanged(nameof(EmptyStateMessage));
 
-        SelectedSubscription = credits.FirstOrDefault(credit => credit.Subscription.Id == selectedId)
-            ?? credits.FirstOrDefault();
+        SelectedSubscription = visible.FirstOrDefault(credit => credit.Subscription.Id == selectedId)
+            ?? visible.FirstOrDefault();
     }
 
     private void LoadMonthlyCreditFields(SubscriptionCredit? credit)
