@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <AssemblyTitle>Cloud Credits Manager</AssemblyTitle>
+    <Product>Cloud Credits Manager</Product>
+    <ProjectGuid>{7EDC9F51-470F-4668-9020-6C53992B7BF8}</ProjectGuid>
+    <!-- Ensures restore produces win-x64 assets so the packaging project's
+         self-contained publish profile (Properties\PublishProfiles\win-x64.pubxml)
+         can publish self-contained without NETSDK1047. Plain build/test stay
+         RID-agnostic. -->
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <PackageReference Include="Azure.ResourceManager" Version="1.14.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AzureCreditsApp.Tests" />
+  </ItemGroup>
+
+</Project>

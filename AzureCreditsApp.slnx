@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="AzureCreditsApp/AzureCreditsApp.csproj" />
+  <Project Path="AzureCreditsApp.Package/AzureCreditsApp.Package.wapproj" />
+  <Project Path="AzureCreditsApp.Tests/AzureCreditsApp.Tests.csproj" />
+</Solution>
