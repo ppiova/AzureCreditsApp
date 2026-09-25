@@ -18,8 +18,8 @@ public interface IAccountService
     Task RemoveAccountAsync(AccountInfo account, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Credential for silent token requests in a tenant (or any organization when
-    /// <paramref name="tenantId"/> is null). It never opens a browser: when the user
+    /// Credential for silent token requests in a tenant (or the tenant the account signed
+    /// in to when <paramref name="tenantId"/> is null). It never opens a browser: when the user
     /// has to interact, token requests throw <see cref="AuthenticationRequiredException"/>.
     /// </summary>
     TokenCredential GetCredential(AccountInfo account, string? tenantId = null);
@@ -28,8 +28,12 @@ public interface IAccountService
 public sealed class AccountService : IAccountService
 {
     private const string AnyOrganization = "organizations";
-    private static readonly string[] ArmScopes = ["https://management.azure.com/.default"];
     private static readonly TokenCachePersistenceOptions TokenCache = new() { Name = "AzureCreditsApp" };
+
+    // The Azure.Core pipeline (BearerTokenAuthenticationPolicy) asks for CAE tokens, and
+    // Azure.Identity keeps CAE tokens in a separate cache. Signing in without CAE would
+    // leave that cache empty and every silent request would fail.
+    private static readonly TokenRequestContext SignInRequest = new(["https://management.azure.com/.default"], isCaeEnabled: true);
 
     private readonly AccountStore _store;
     private readonly Dictionary<string, AuthenticationRecord> _records = new(StringComparer.Ordinal);
@@ -64,7 +68,7 @@ public sealed class AccountService : IAccountService
     public async Task<AccountInfo> AddAccountAsync(CancellationToken cancellationToken = default)
     {
         InteractiveBrowserCredential credential = new(CreateOptions(AnyOrganization, record: null, allowInteraction: true));
-        AuthenticationRecord record = await credential.AuthenticateAsync(new TokenRequestContext(ArmScopes), cancellationToken);
+        AuthenticationRecord record = await credential.AuthenticateAsync(SignInRequest, cancellationToken);
 
         await RememberAsync(record, cancellationToken);
         return ToAccount(record);
@@ -76,7 +80,7 @@ public sealed class AccountService : IAccountService
         options.LoginHint = account.Username;
 
         AuthenticationRecord record = await new InteractiveBrowserCredential(options)
-            .AuthenticateAsync(new TokenRequestContext(ArmScopes), cancellationToken);
+            .AuthenticateAsync(SignInRequest, cancellationToken);
 
         await RememberAsync(record, cancellationToken);
     }
@@ -95,19 +99,21 @@ public sealed class AccountService : IAccountService
 
     public TokenCredential GetCredential(AccountInfo account, string? tenantId = null)
     {
-        string tenant = tenantId ?? AnyOrganization;
-        string key = $"{account.Id}|{tenant}";
-
         lock (_gate)
         {
-            if (_credentials.TryGetValue(key, out TokenCredential? existing))
-            {
-                return existing;
-            }
-
             if (!_records.TryGetValue(account.Id, out AuthenticationRecord? record))
             {
                 throw new InvalidOperationException($"{account.Username} is not signed in.");
+            }
+
+            // Silent requests need a concrete tenant. For a personal Microsoft account,
+            // "organizations" resolves to the consumer tenant, which Azure Resource Manager
+            // rejects (AADSTS9002332), so fall back to the tenant the account signed in to.
+            string tenant = tenantId ?? record.TenantId;
+            string key = $"{account.Id}|{tenant}";
+            if (_credentials.TryGetValue(key, out TokenCredential? existing))
+            {
+                return existing;
             }
 
             InteractiveBrowserCredential credential = new(CreateOptions(tenant, record, allowInteraction: false));
