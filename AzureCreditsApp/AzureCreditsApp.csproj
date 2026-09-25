@@ -20,8 +20,9 @@
 
   <ItemGroup>
     <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Also embedded so the window icon resolves from the assembly in any host. -->
+    <Resource Include="Assets\AppIcon.ico" />
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
-    <PackageReference Include="Azure.ResourceManager" Version="1.14.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
   </ItemGroup>
 
