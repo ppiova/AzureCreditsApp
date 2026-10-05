@@ -1,5 +1,6 @@
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using AzureCreditsApp.Services;
 using AzureCreditsApp.ViewModels;
 
 namespace AzureCreditsApp;
@@ -25,6 +26,13 @@ public partial class App : System.Windows.Application
     {
         ServiceCollection services = new();
 
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<AccountStore>();
+        services.AddSingleton<CostCache>();
+        services.AddSingleton<IAccountService, AccountService>();
+        services.AddSingleton<IMonthlyCreditStore, MonthlyCreditStore>();
+        services.AddSingleton<IAppSettingsStore, AppSettingsStore>();
+        services.AddSingleton<IAzureCreditService, AzureCreditService>();
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();
 
