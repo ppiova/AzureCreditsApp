@@ -41,12 +41,10 @@
     </AppxManifest>
   </ItemGroup>
 
+  <!-- Every logo size: the unqualified file is scale-100, plus scale-200 and the
+       unplated target sizes Windows uses for the taskbar and Start. -->
   <ItemGroup>
-    <Content Include="Assets\SplashScreen.png" />
-    <Content Include="Assets\Square44x44Logo.png" />
-    <Content Include="Assets\Square150x150Logo.png" />
-    <Content Include="Assets\StoreLogo.png" />
-    <Content Include="Assets\Wide310x150Logo.png" />
+    <Content Include="Assets\*.png" />
   </ItemGroup>
 
   <ItemGroup>

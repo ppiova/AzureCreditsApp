@@ -1,8 +1,16 @@
 # Cloud Credits Manager
 
+[![CI](https://github.com/ppiova/AzureCreditsApp/actions/workflows/ci.yml/badge.svg)](https://github.com/ppiova/AzureCreditsApp/actions/workflows/ci.yml)
+[![Build MSIX](https://github.com/ppiova/AzureCreditsApp/actions/workflows/msix-release.yml/badge.svg)](https://github.com/ppiova/AzureCreditsApp/actions/workflows/msix-release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 Cloud Credits Manager is a Windows desktop app for tracking Azure credits across Microsoft accounts and subscriptions without opening the Azure portal.
 
-> Work in progress. See the [issues](../../issues) and [milestones](../../milestones) for the roadmap.
+## Preview
+
+![Cloud Credits Manager preview](docs/screenshot.png)
+
+The screenshot uses sample data.
 
 ## Features
 
@@ -29,7 +37,9 @@ Credit on a billing profile is shared by every subscription billed to it, so the
 
 ## Privacy
 
-The app only reads from Azure. Sign-in uses the Microsoft identity platform in your browser; tokens are kept in the Windows-protected MSAL token cache. The app stores, under `%AppData%\AzureCreditsApp`:
+The app only reads from Azure, and sends nothing to the developer or any third party. See the [privacy policy](docs/privacy-policy.md).
+
+Sign-in uses the Microsoft identity platform in your browser; tokens are kept in the Windows-protected MSAL token cache. The app stores, under `%AppData%\AzureCreditsApp`:
 
 - `accounts\` — which accounts are signed in (no tokens),
 - `monthly-credits.json` — the monthly amounts you entered,
@@ -67,6 +77,19 @@ dotnet test .\AzureCreditsApp.Tests\AzureCreditsApp.Tests.csproj
 | `AzureCreditsApp.Tests` | xUnit tests. |
 
 The packaging project needs the Visual Studio MSIX tooling (DesktopBridge targets), so it is built with MSBuild in GitHub Actions rather than with `dotnet build`.
+
+## MSIX releases
+
+GitHub Actions builds the MSIX package: every pull request checks that packaging still works, a version tag publishes a signed package to [GitHub Releases](../../releases), and a manual workflow builds the package for the Microsoft Store.
+
+```powershell
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+See [PACKAGING.md](PACKAGING.md) for installing a release, the signing certificate, and the Microsoft Store submission steps.
+
+If Windows shows certificate error `0x800B010A`, download the release ZIP and run `Install-CloudCreditsManager.ps1`, or import the included `.cer` before opening the `.msix`.
 
 ## License
 

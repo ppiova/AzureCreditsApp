@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore .\AzureCreditsApp.Tests\AzureCreditsApp.Tests.csproj
+
+      - name: Build
+        run: dotnet build .\AzureCreditsApp.Tests\AzureCreditsApp.Tests.csproj --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test .\AzureCreditsApp.Tests\AzureCreditsApp.Tests.csproj --configuration Release --no-build --logger trx --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults\*.trx
+          if-no-files-found: ignore
+
+  # Builds the MSIX without signing so a change that breaks packaging is caught
+  # in the pull request, not when a release is cut.
+  package:
+    name: Build MSIX package
+    runs-on: windows-2022
+
+    env:
+      PACKAGE_PROJECT: AzureCreditsApp.Package\AzureCreditsApp.Package.wapproj
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore
+        run: dotnet restore .\AzureCreditsApp\AzureCreditsApp.csproj
+
+      - name: Build MSIX (unsigned)
+        shell: pwsh
+        run: |
+          msbuild $env:PACKAGE_PROJECT `
+            /restore `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /p:AppxBundle=Never `
+            /p:UapAppxPackageBuildMode=SideloadOnly `
+            /p:AppxPackageSigningEnabled=false `
+            /p:GenerateAppxPackageOnBuild=true
+
+      - name: Check the package was produced
+        shell: pwsh
+        run: |
+          $packages = Get-ChildItem -Path AzureCreditsApp.Package\AppPackages -Recurse -Include *.msix
+          if ($packages.Count -eq 0) {
+            Get-ChildItem -Path AzureCreditsApp.Package -Recurse -Include *.msix, *.msixupload | Select-Object FullName
+            throw "No .msix package was produced."
+          }
+
+          $packages | ForEach-Object { "{0} ({1:N1} MB)" -f $_.Name, ($_.Length / 1MB) }
